@@ -3,14 +3,14 @@ function modenv(func, env)
 	local lookup = {}
 
 	local function addlookup(object, real)
-		if real and typeof(real) == "Instance" then
+		if real and type(real) == "userdata" then
 			lookup[object] = real
 		end
 	end
 
 	local function findby(key, index, _env)
 		if _env == nil then _env = env end
-		for i, v in _env do
+		for i, v in pairs(_env) do
 			if i == index or i == key then
 				return v
 			end
@@ -22,20 +22,23 @@ function modenv(func, env)
 		return setmetatable({}, {__index = function(_self, i)
 			local item = self[i]
 			local modded = findby(item, i, env) or findby(item, i)
-			
+
 			if modded ~= nil then
+				print("return modded")
 				addlookup(modded, item)
 				return modded
 			end
 
 			if type(item) == "userdata" or type(item) == "table" then
+				print("return small")
 				local small = smallenv(item, i)
 				addlookup(small, item)
 				return small
 			end
-			
+
 			---- support for namecall methods (i.e. game:GetService())
-			if type(item) == "function" and typeof(self) == "Instance" then
+			if type(item) == "function" and type(self) == "Instance" then
+				print("return wrapper")
 				local function wrapper(...)
 					local value = item(self, select(2, unpack({...})))
 					if findby(value) and type(value) == "userdata" then
@@ -50,7 +53,7 @@ function modenv(func, env)
 				end
 				return wrapper
 			end
-			
+
 			return self[i]
 		end,
 		__newindex = function(_self, i, v)
@@ -68,9 +71,8 @@ function modenv(func, env)
 
 	local function splitenv(self, mod, dbg)
 		return setmetatable({}, {__index = function(_self, i)
-
 			local exists, item = pcall(function() return self[i] end)
-			local modded = mod[i]
+			local modded = mod[i] or (exists and env[item] or nil)
 
 			if (type(item) == "userdata" or type(item) == "table") and modded then
 				local split = splitenv(item, modded, dbg .. "/" .. i)
@@ -84,15 +86,13 @@ function modenv(func, env)
 			end
 
 			---- support for namecall methods (i.e. game:GetService())
-			if type(item) == "function" and typeof(self) == "Instance" then
+			if type(item) == "function" and type(self) == "Instance" then
 				local function wrapper(...)
 					local value = item(self, select(2, unpack({...})))
-					print(value, item, ...)
 					if findby(value) then
 						return findby(value)
 					end
 					if type(value) == "userdata" or type(value) == "table" then
-						print("made smallenv of", i)
 						local small = smallenv(value, i)
 						addlookup(small, value)
 						return small
@@ -120,7 +120,7 @@ function modenv(func, env)
 	local newenv = setmetatable({}, {__index = function(self, i)
 		local item = fenv[i]
 		local modded = findby(item)
-		
+
 		if (modded ~= nil) then
 			if type(modded) == "userdata" or type(modded) == "table" then
 				local split = splitenv(item, modded, i)
@@ -130,7 +130,7 @@ function modenv(func, env)
 			addlookup(modded, item)
 			return modded
 		end
-
+		
 		if type(item) == "userdata" or type(item) == "table" then
 			local small = smallenv(item, i)
 			addlookup(small, item)
@@ -179,11 +179,13 @@ function modenv(func, env)
 		end
 		return otype(object)
 	end
-	newenv.typeof = function(object)
-		if lookup[object] ~= nil then
-			return "Instance"
+	if otypeof ~= nil then
+		newenv.typeof = function(object)
+			if lookup[object] ~= nil then
+				return "Instance"
+			end
+			return otypeof(object)
 		end
-		return otypeof(object)
 	end
 	newenv.rawequal = function(v1, v2)
 		return orawequal(lookup[v1] or v1, lookup[v2] or v2)
