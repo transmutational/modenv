@@ -12,22 +12,32 @@ very detectable instrumentation but a method that works like hookfunction nevert
 -- paste modenv source above
 
 function run()
-    print(game:AMethodThatDoesntExist("hey"))
-    loadstring(game:HttpGet("https://gist.github.com/transmutational/0a9a3675340da39f3fc948cbb9827e6a/raw/script.lua"))()
+	warn("game.Workspace:", game.Workspace)
+	warn("game:FindFirstChild(\"Workspace\"):", game:FindFirstChild("Workspace"))
+	print("game:AMethodThatDoesntExist()", game:AMethodThatDoesntExist())
+	print("game:GetService(\"Players\"):", game:GetService("Players"))
+	
+	-- works in executors
+	--print(loadstring(game:HttpGet("https://gist.github.com/transmutational/0a9a3675340da39f3fc948cbb9827e6a/raw/script.lua"))())
 end
 
 local env = {}
 
-env[game.HttpGet] = function(self, url)
-    print("Datamodel:HttpGet()", url)
-    return game.HttpGet(game, url)
+-- works in executors
+--env[game.HttpGet] = function(self, ...)
+--	print("DataModel:HttpGet()", ...)
+--	return game.HttpGet(self, ...)
+--end
+
+env[game.GetService] = function(self, srv)
+	warn("Returning fake service :3", srv)
+	return workspace
 end
 
 env[game] = {
-    AMethodThatDoesntExist = function(self, text)
-        print("AMethodThatDoesntExist", text)
-        return text
-    end
+	AMethodThatDoesntExist = function(self)
+		return "hewwo from a custom method~!"
+	end
 }
 
 modenv(run, env)
